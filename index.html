@@ -13,11 +13,11 @@
   --muted: #52606D;
   --primary: #33475B;
   --on-primary: #FFFFFF;
-  --danger: #E49753;
+  --danger: #8A2E0B;
   --focus: #33475B;
   --on-mark: #FFFFFF;
-  --pos-bg: #DDF1E4; --pos: #6AB890; --pos-text: #14472B;
-  --neg-bg: #FDE7D6; --neg: #FFA555; --neg-text: #AC4400;
+  --pos-bg: #DDF1E4; --pos: #2E7D4F; --pos-text: #14472B;
+  --neg-bg: #FDE7D6; --neg: #C2570C; --neg-text: #6F3006;
   --neu-bg: #E7E9EC; --neu: #6B7684; --neu-text: #1F2933;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
 }
@@ -1134,13 +1134,8 @@ var Logic = (() => {
       return;
     }
     if (session) {
-      if (!appBooted && !supabaseSession) {
-        supabaseSession = session;
-        cleanUrlHash();
-        location.reload();
-      } else {
-        supabaseSession = session;
-      }
+      // Just remember the session. Reloading here made the page load twice on every open.
+      supabaseSession = session;
     }
   });
 
@@ -1306,21 +1301,22 @@ var Logic = (() => {
         if (error) {
           console.error('Supabase sync error:', error);
           syncError = 'Could not save changes to Supabase (' + error.message + ').';
-          render();
+          refreshSyncBanner();
         } else if (!needsSync) {
           hasPendingChanges = false;
           if (syncError) {
             syncError = '';
-            render();
+            refreshSyncBanner();
           }
         }
       } catch (e) {
         console.error('Sync exception:', e);
         syncError = 'Could not save changes to Supabase. Check your connection.';
-        render();
+        refreshSyncBanner();
       } finally {
         isSyncing = false;
         activeSyncPromise = null;
+        refreshSyncBanner(); // so a failed save shows a usable Retry button, not a stuck "Saving…"
         if (needsSync) {
           needsSync = false;
           scheduleSync();
@@ -1517,9 +1513,18 @@ var Logic = (() => {
 
   function go(v) { view = v; ui.err = ''; render(true); }
 
+  /** Show, change or hide the save-error banner without redrawing the whole screen. */
+  function refreshSyncBanner() {
+    var old = app.querySelector('[data-sync]'), html = syncBannerHtml();
+    if (old) { if (html) { var w = document.createElement('div'); w.innerHTML = html; old.replaceWith(w.firstChild); } else old.remove(); return; }
+    if (!html) return;
+    var anchor = app.querySelector('.frame > .progress') || app.querySelector('.frame > #scroll');
+    if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
+  }
+
   function syncBannerHtml() {
     if (!syncError) return '';
-    return '<div class="banner" role="alert">' + esc(syncError) + ' Your changes are kept on screen. <button type="button" data-action="sync-retry"' + (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? 'Saving…' : 'Retry') + '</button></div>';
+    return '<div class="banner" data-sync="1" role="alert">' + esc(syncError) + ' Your changes are kept on screen. <button type="button" data-action="sync-retry"' + (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? 'Saving…' : 'Retry') + '</button></div>';
   }
 
   // ---------- shared pieces ----------
@@ -2143,7 +2148,7 @@ var Logic = (() => {
     var a = el.getAttribute('data-action'), d = el.dataset;
     switch (a) {
       case 'sync-retry':
-        render();
+        refreshSyncBanner();
         doSync();
         break;
       case 'ob-back': ui.obStep--; ui.err = ''; render(); break;
