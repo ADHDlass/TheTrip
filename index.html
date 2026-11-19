@@ -1,4 +1,6 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body>
 <title>The Tripping Diary</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -266,7 +268,6 @@ var Logic = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // entry.ts
   var entry_exports = {};
   __export(entry_exports, {
     QUESTIONS: () => QUESTIONS,
@@ -292,7 +293,6 @@ var Logic = (() => {
     toggleOption: () => toggleOption
   });
 
-  // ../../../../../../home/claude/adhd-med-tracker/src/questions.ts
   var P = "positive";
   var N = "negative";
   var U = "neutral";
@@ -532,7 +532,6 @@ var Logic = (() => {
   var QUESTION_COUNT = QUESTIONS.length;
   var QUESTION_BY_ID = Object.fromEntries(QUESTIONS.map((q) => [q.id, q]));
 
-  // ../../../../../../home/claude/adhd-med-tracker/src/answers.ts
   function toggleOption(q, selected, optionId) {
     const opt = q.options.find((o2) => o2.id === optionId);
     if (!opt) return selected;
@@ -543,7 +542,6 @@ var Logic = (() => {
     return has ? rest.filter((id) => id !== optionId) : [...rest, optionId];
   }
 
-  // ../../../../../../home/claude/adhd-med-tracker/src/dates.ts
   var pad = (n) => String(n).padStart(2, "0");
   function toDateKey(d = /* @__PURE__ */ new Date()) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -576,7 +574,6 @@ var Logic = (() => {
     return /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
   }
 
-  // ../../../../../../home/claude/adhd-med-tracker/src/backup.ts
   var BACKUP_APP = "med-diary";
   var BACKUP_VERSION = 2;
   function buildBackup(settings, entries, quickLogs = [], now = /* @__PURE__ */ new Date()) {
@@ -777,7 +774,6 @@ var Logic = (() => {
     };
   }
 
-  // ../../../../../../home/claude/adhd-med-tracker/src/analysis.ts
   function selectedOptions(entry, includeTiming = false) {
     const out = [];
     for (const q of QUESTIONS) {
@@ -937,44 +933,352 @@ var Logic = (() => {
   }
   return __toCommonJS(entry_exports);
 })();
-
 </script>
+
 <script>
-(function () {
+(async function () {
   'use strict';
   var L = Logic;
-  var KEY_SETTINGS = 'meddiary.settings.v2', PREFIX = 'meddiary.entry.v2.', KEY_META = 'meddiary.meta.v2';
   var VAL = { positive: 'pos', negative: 'neg', neutral: 'neu' };
   var WORD = { positive: 'Helped', negative: 'Difficult', neutral: 'Neutral' };
   var GLYPH = { positive: '+', negative: '!', neutral: '–' };
+  var app = document.getElementById('app');
 
-  // ---------- storage (every call guarded; the page still works if the browser refuses to save) ----------
-  var storageOk = true, mem = {};
-  function sget(k) { try { var v = localStorage.getItem(k); return v === null ? (mem[k] === undefined ? null : mem[k]) : v; } catch (e) { storageOk = false; return mem[k] === undefined ? null : mem[k]; } }
-  function sset(k, v) { mem[k] = v; try { localStorage.setItem(k, v); } catch (e) { storageOk = false; } }
-  function sdel(k) { delete mem[k]; try { localStorage.removeItem(k); } catch (e) { } }
-  function skeys() { var out = []; try { for (var i = 0; i < localStorage.length; i++) out.push(localStorage.key(i)); } catch (e) { storageOk = false; } Object.keys(mem).forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); return out; }
-  var persisted = null;
-  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(function (ok) { persisted = !!ok; }, function () { }); } catch (e) { }
-  try { localStorage.setItem('meddiary.probe', '1'); localStorage.removeItem('meddiary.probe'); } catch (e) { storageOk = false; }
-  function readJson(k) { try { var v = sget(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  var settings = readJson(KEY_SETTINGS) || { onboarded: false, medications: [] };
-  var meta = readJson(KEY_META) || { lastExportAt: null };
-  var entries = {}, quickLogs = {}, QPREFIX = 'meddiary.qlogs.v2.';
-  skeys().forEach(function (k) {
-    if (k.indexOf(PREFIX) === 0) { try { var e = JSON.parse(sget(k)); if (e && e.date) entries[e.date] = e; } catch (x) { } }
-    else if (k.indexOf(QPREFIX) === 0) { try { var arr = JSON.parse(sget(k)); if (Array.isArray(arr) && arr.length) quickLogs[k.slice(QPREFIX.length)] = arr; } catch (x) { } }
+  // ---------- Supabase Initialization & Authentication ----------
+  const supabaseUrl = 'https://ssdisdgxjekzoygldirs.supabase.co';
+  const supabaseKey = 'sb_publishable_JiCcGj9TVNAJ_dKkSjN28Q_iKMq61A5';
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  let supabaseSession = null;
+
+  window.diaryLogin = async function (email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email, password: password });
+    if (error) {
+      console.error('Login failed:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, data: data };
+  };
+  window.diaryLogout = async function () {
+    await supabase.auth.signOut();
+    location.reload();
+  };
+
+  supabase.auth.onAuthStateChange(function (event, session) {
+    if (event === 'SIGNED_OUT') {
+      supabaseSession = null;
+      location.reload();
+    } else if (event === 'SIGNED_IN' && !supabaseSession && session) {
+      supabaseSession = session;
+      if (window.location.hash.indexOf('#setup') === 0) {
+        try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { }
+      }
+      location.reload();
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      supabaseSession = session;
+    }
   });
 
-  function saveSettings() { sset(KEY_SETTINGS, JSON.stringify(settings)); }
-  function saveMeta() { sset(KEY_META, JSON.stringify(meta)); }
-  function putEntry(e) { entries[e.date] = e; sset(PREFIX + e.date, JSON.stringify(e)); }
-  function dropEntry(d) { delete entries[d]; sdel(PREFIX + d); }
+  function renderUnauthenticated() {
+    if (window.location.hash.indexOf('#setup') === 0) {
+      app.innerHTML =
+        '<div class="frame"><div class="scroll" style="padding-top:32px">' +
+        '<h1>One-time setup</h1>' +
+        '<p class="muted">Sign in once with your Supabase account to connect your diary on this device.</p>' +
+        '<form id="setup-form">' +
+        '<div class="field"><label for="setup-email">Email</label><input class="input" id="setup-email" type="email" required autocomplete="email"></div>' +
+        '<div class="field"><label for="setup-pass">Password</label><input class="input" id="setup-pass" type="password" required autocomplete="current-password"></div>' +
+        '<p class="err" id="setup-err" role="alert" style="display:none"></p>' +
+        '<button class="btn primary" id="setup-btn" type="submit">Connect diary</button>' +
+        '</form>' +
+        '</div></div>';
+      var form = document.getElementById('setup-form');
+      if (form) {
+        form.addEventListener('submit', async function (ev) {
+          ev.preventDefault();
+          var email = document.getElementById('setup-email').value.trim();
+          var password = document.getElementById('setup-pass').value;
+          var btn = document.getElementById('setup-btn');
+          var errEl = document.getElementById('setup-err');
+          errEl.style.display = 'none';
+          btn.disabled = true;
+          btn.textContent = 'Connecting...';
+          var res = await window.diaryLogin(email, password);
+          if (!res.ok) {
+            errEl.textContent = res.error;
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Connect diary';
+          } else {
+            try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { }
+            location.reload();
+          }
+        });
+      }
+      return;
+    }
+
+    app.innerHTML =
+      '<div class="frame"><div class="scroll" style="padding-top:40px;text-align:center">' +
+      '<h1>Authentication Required</h1>' +
+      '<p class="muted">This browser is not connected to your diary account yet.</p>' +
+      '<p class="muted small">Open this page with <b>#setup</b> at the end of the address to complete the one-time sign-in.</p>' +
+      '</div></div>';
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getSession();
+  if (authError) {
+    app.innerHTML =
+      '<div class="frame"><div class="scroll" style="padding-top:40px">' +
+      '<h1>Connection Error</h1>' +
+      '<p class="err" role="alert">' + esc(authError.message) + '</p>' +
+      '<button class="btn primary" onclick="location.reload()">Retry</button>' +
+      '</div></div>';
+    return;
+  }
+  supabaseSession = authData.session;
+
+  if (!supabaseSession) {
+    window.addEventListener('hashchange', function () {
+      if (!supabaseSession) renderUnauthenticated();
+    });
+    renderUnauthenticated();
+    return;
+  }
+
+  if (window.location.hash.indexOf('#setup') === 0) {
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { }
+  }
+
+  // ---------- Load Cloud Data Before Rendering ----------
+  const { data: dbData, error: dbError } = await supabase
+    .from('app_data')
+    .select('data')
+    .eq('user_id', supabaseSession.user.id)
+    .maybeSingle();
+
+  if (dbError) {
+    app.innerHTML =
+      '<div class="frame"><div class="scroll" style="padding-top:40px">' +
+      '<h1>Connection Error</h1>' +
+      '<p class="muted">Could not load your diary from Supabase.</p>' +
+      '<p class="err" role="alert">' + esc(dbError.message) + '</p>' +
+      '<button class="btn primary" onclick="location.reload()">Retry</button>' +
+      '</div></div>';
+    return;
+  }
+
+  // ---------- Core Data State (Safely Hydrated) ----------
+  var settings = { onboarded: false, medications: [] };
+  var meta = { lastExportAt: null };
+  var entries = {};
+  var quickLogs = {};
+
+  if (dbData && dbData.data && typeof dbData.data === 'object') {
+    var rawSettings = (dbData.data.settings && typeof dbData.data.settings === 'object') ? dbData.data.settings : {};
+    settings = {
+      onboarded: !!rawSettings.onboarded,
+      medications: Array.isArray(rawSettings.medications) ? rawSettings.medications : []
+    };
+    var rawMeta = (dbData.data.meta && typeof dbData.data.meta === 'object') ? dbData.data.meta : {};
+    meta = Object.assign({ lastExportAt: null }, rawMeta);
+    if (dbData.data.entries && typeof dbData.data.entries === 'object' && !Array.isArray(dbData.data.entries)) {
+      entries = dbData.data.entries;
+    }
+    if (dbData.data.quickLogs && typeof dbData.data.quickLogs === 'object' && !Array.isArray(dbData.data.quickLogs)) {
+      quickLogs = dbData.data.quickLogs;
+    }
+  }
+
+  // ---------- Reliable Sync Logic ----------
+  var syncTimer = null;
+  var isSyncing = false;
+  var needsSync = false;
+  var stateVersion = 0;
+  var hasUnsavedChanges = false;
+  var syncError = '';
+
+  function buildCloudPayload() {
+    return {
+      settings: {
+        onboarded: !!settings.onboarded,
+        medications: Array.isArray(settings.medications) ? settings.medications : []
+      },
+      meta: Object.assign({ lastExportAt: null }, meta),
+      entries: entries,
+      quickLogs: quickLogs
+    };
+  }
+
+  async function doSync() {
+    if (!supabaseSession) return false;
+    if (syncTimer) {
+      clearTimeout(syncTimer);
+      syncTimer = null;
+    }
+    if (isSyncing) {
+      needsSync = true;
+      return false;
+    }
+    isSyncing = true;
+    var versionAtStart = stateVersion;
+    var ok = false;
+    try {
+      var payload = buildCloudPayload();
+      var res = await supabase
+        .from('app_data')
+        .upsert({
+          user_id: supabaseSession.user.id,
+          data: payload,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (res.error) {
+        console.error('Supabase sync error:', res.error);
+        syncError = 'Changes could not be saved (' + res.error.message + ').';
+        render();
+      } else {
+        if (stateVersion === versionAtStart) {
+          hasUnsavedChanges = false;
+          syncError = '';
+        }
+        ok = true;
+        render();
+      }
+    } catch (e) {
+      console.error('Sync exception:', e);
+      syncError = 'Changes could not be saved. Check your connection.';
+      render();
+    } finally {
+      isSyncing = false;
+      if (needsSync || stateVersion > versionAtStart) {
+        needsSync = false;
+        scheduleSync();
+      }
+    }
+    return ok;
+  }
+
+  function scheduleSync() {
+    stateVersion++;
+    hasUnsavedChanges = true;
+    if (isSyncing) {
+      needsSync = true;
+      return;
+    }
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(doSync, 800);
+  }
+
+  async function wipeAllData() {
+    if (syncTimer) {
+      clearTimeout(syncTimer);
+      syncTimer = null;
+    }
+    needsSync = false;
+    var emptyPayload = {
+      settings: { onboarded: false, medications: [] },
+      meta: { lastExportAt: null },
+      entries: {},
+      quickLogs: {}
+    };
+    while (isSyncing) {
+      await new Promise(function (r) { setTimeout(r, 50); });
+    }
+    isSyncing = true;
+    stateVersion++;
+    var versionAtWipe = stateVersion;
+    try {
+      var res = await supabase
+        .from('app_data')
+        .upsert({
+          user_id: supabaseSession.user.id,
+          data: emptyPayload,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (res.error) {
+        console.error('Supabase wipe error:', res.error);
+        syncError = 'Could not delete data (' + res.error.message + ').';
+        ui.setMode = 'list';
+        render(true);
+        return;
+      }
+
+      entries = {};
+      quickLogs = {};
+      settings = { onboarded: false, medications: [] };
+      meta = { lastExportAt: null };
+      ui.toast = '';
+      ui.obStep = 0;
+      ui.obDose = '';
+      ui.setMode = 'list';
+      if (stateVersion === versionAtWipe) {
+        hasUnsavedChanges = false;
+        syncError = '';
+      }
+      go({ name: 'onboarding' });
+    } catch (e) {
+      console.error('Wipe exception:', e);
+      syncError = 'Could not delete data. Check your connection.';
+      ui.setMode = 'list';
+      render(true);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && (syncTimer || hasUnsavedChanges)) {
+      doSync();
+    }
+  });
+  window.addEventListener('pagehide', function () {
+    if (syncTimer || hasUnsavedChanges) {
+      doSync();
+    }
+  });
+  window.addEventListener('beforeunload', function (ev) {
+    if (syncTimer || hasUnsavedChanges || isSyncing) {
+      doSync();
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
+  window.addEventListener('online', function () {
+    if (hasUnsavedChanges || syncError) {
+      doSync();
+    }
+  });
+
+  function saveSettings() { scheduleSync(); }
+  function saveMeta() { scheduleSync(); }
+  function putEntry(e) { entries[e.date] = e; scheduleSync(); }
+  function dropEntry(d) { delete entries[d]; scheduleSync(); }
+
+  function putQuickLog(l) {
+    var arr = (quickLogs[l.date] || []).filter(function (x) { return x.id !== l.id; });
+    arr.push(l); quickLogs[l.date] = arr;
+    scheduleSync();
+  }
+  function removeQuickLog(id) {
+    Object.keys(quickLogs).forEach(function (d) {
+      var arr = quickLogs[d].filter(function (x) { return x.id !== id; });
+      if (arr.length === quickLogs[d].length) return;
+      if (arr.length) { quickLogs[d] = arr; } else { delete quickLogs[d]; }
+      scheduleSync();
+    });
+  }
+
   function logsOn(date) { return (quickLogs[date] || []).slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; }); }
   function allQuickLogs() { var out = []; Object.keys(quickLogs).forEach(function (d) { out = out.concat(quickLogs[d]); }); return out; }
-  function putQuickLog(l) { var arr = (quickLogs[l.date] || []).filter(function (x) { return x.id !== l.id; }); arr.push(l); quickLogs[l.date] = arr; sset(QPREFIX + l.date, JSON.stringify(arr)); }
-  function removeQuickLog(id) { Object.keys(quickLogs).forEach(function (d) { var arr = quickLogs[d].filter(function (x) { return x.id !== id; }); if (arr.length === quickLogs[d].length) return; if (arr.length) { quickLogs[d] = arr; sset(QPREFIX + d, JSON.stringify(arr)); } else { delete quickLogs[d]; sdel(QPREFIX + d); } }); }
   function entryList() { return Object.keys(entries).sort().reverse().map(function (d) { return entries[d]; }); }
   function currentMed() { var m = settings.medications.slice().sort(function (a, b) { return a.startDate < b.startDate ? 1 : -1; }); for (var i = 0; i < m.length; i++) if (!m[i].endDate) return m[i]; return m[m.length - 1]; }
   function medOn(date) { var m = settings.medications.filter(function (x) { return x.startDate <= date && (!x.endDate || x.endDate >= date); }).sort(function (a, b) { return a.startDate < b.startDate ? 1 : -1; })[0]; return m || currentMed(); }
@@ -984,14 +1288,11 @@ var Logic = (() => {
   try { if (window.claude && window.claude.use) window.claude.use('downloads').then(function (d) { downloads = d; if (view.name === 'export') render(); }, function () { }); } catch (e) { }
 
   // ---------- helpers ----------
-  var app = document.getElementById('app');
-  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
   function icon(v, sm) { return '<span class="vi ' + VAL[v] + (sm ? ' sm' : '') + '" aria-hidden="true">' + GLYPH[v] + '</span>'; }
   function parseDose(t) { var n = Number(String(t).replace(',', '.')); return isFinite(n) && n > 0 && String(t).trim() !== '' ? n : undefined; }
   function today() { return L.toDateKey(); }
-  var HISTORY_JSON = "{\n  \"app\": \"med-diary\",\n  \"schemaVersion\": 2,\n  \"exportedAt\": \"2026-11-18T12:52:47.993Z\",\n  \"medications\": [\n    {\n      \"id\": \"medikinet-adult-10mg\",\n      \"name\": \"Medikinet Adult\",\n      \"doseMg\": 10,\n      \"startDate\": \"2026-11-07\"\n    }\n  ],\n  \"entries\": [\n    {\n      \"date\": \"2026-11-07\",\n      \"medicationId\": \"medikinet-adult-10mg\",\n      \"status\": \"complete\",\n      \"step\": 13,\n      \"answers\": {\n        \"q1\": {\n          \"selected\": [\n            \"morning\"\n          ]\n        },\n        \"q2\": {\n          \"selected\": [\n            \"30to60\"\n          ],\n          \"note\": \"Original: Within 30–60 minutes (recorded as 30 to 60 minutes).\"\n        },\n        \"q3\": {\n          \"selected\": [\n            \"clearer\",\n            \"organised\"\n          ],\n          \"note\": \"Not matched to an option: More thoughts and ideas; More mental energy; Talked more.\"\n        },\n        \"q4\": {\n          \"selected\": [\n            \"confident\",\n            \"happier\"\n          ]\n        },\n        \"q5\": {\n          \"selected\": [\n            \"start\",\n            \"finish\",\n            \"prioritise\",\n            \"motivated\"\n          ],\n          \"note\": \"Original: More motivated to do postponed tasks (recorded as More motivated or productive).\"\n        },\n        \"q6\": {\n          \"selected\": [\n            \"return\",\n            \"struggled\"\n          ],\n          \"note\": \"Not matched to an option: Less distracted by external stimuli.\"\n        },\n        \"q7\": {\n          \"selected\": [\n            \"patient\",\n            \"lessimpulsive\",\n            \"lessreactive\"\n          ],\n          \"note\": \"Not matched to an option: Less anxious or stressed; More socially confident.\"\n        },\n        \"q8\": {\n          \"selected\": [\n            \"other\"\n          ],\n          \"note\": \"Original: Physical anxiety or tension (no matching option, recorded as Other).\"\n        },\n        \"q9\": {\n          \"selected\": [\n            \"unsure\"\n          ],\n          \"note\": \"Original: Not sure / other.\"\n        },\n        \"q10\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q11\": {\n          \"selected\": [\n            \"gradual\"\n          ]\n        },\n        \"q12\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q13\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q14\": {\n          \"selected\": [\n            \"same\"\n          ]\n        }\n      },\n      \"details\": {\n        \"doseMg\": 10,\n        \"withFood\": true\n      },\n      \"updatedAt\": \"2026-11-18T12:52:47.993Z\"\n    },\n    {\n      \"date\": \"2026-11-08\",\n      \"medicationId\": \"medikinet-adult-10mg\",\n      \"status\": \"complete\",\n      \"step\": 13,\n      \"answers\": {\n        \"q1\": {\n          \"selected\": [\n            \"morning\"\n          ]\n        },\n        \"q2\": {\n          \"selected\": [\n            \"30to60\"\n          ],\n          \"note\": \"Original: Within 30–60 minutes (recorded as 30 to 60 minutes).\"\n        },\n        \"q3\": {\n          \"selected\": [\n            \"clearer\",\n            \"organised\"\n          ],\n          \"note\": \"Not matched to an option: Happier and more positive; More thoughts and ideas; More mentally energetic.\"\n        },\n        \"q4\": {\n          \"selected\": [\n            \"happier\",\n            \"confident\"\n          ],\n          \"note\": \"Original: Noticeably happier (recorded as Happier or more positive).\"\n        },\n        \"q5\": {\n          \"selected\": [\n            \"start\",\n            \"finish\",\n            \"prioritise\",\n            \"motivated\"\n          ],\n          \"note\": \"Original: More motivated to do postponed tasks; More productive overall (both recorded as More motivated or productive).\"\n        },\n        \"q6\": {\n          \"selected\": [\n            \"struggled\"\n          ]\n        },\n        \"q7\": {\n          \"selected\": [\n            \"patient\",\n            \"lessimpulsive\",\n            \"lessreactive\",\n            \"calmstress\"\n          ],\n          \"note\": \"Not matched to an option: Less anxious or stressed; More socially confident.\"\n        },\n        \"q8\": {\n          \"selected\": [\n            \"nausea\"\n          ],\n          \"note\": \"Original: Nausea; Stomach discomfort; Mild cramps (recorded as Nausea or stomach discomfort).\"\n        },\n        \"q9\": {\n          \"selected\": [\n            \"same\"\n          ]\n        },\n        \"q10\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q11\": {\n          \"selected\": [\n            \"gradual\"\n          ]\n        },\n        \"q12\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q13\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q14\": {\n          \"selected\": [\n            \"same\"\n          ]\n        }\n      },\n      \"details\": {\n        \"doseMg\": 10,\n        \"withFood\": true\n      },\n      \"updatedAt\": \"2026-11-18T12:52:47.993Z\"\n    },\n    {\n      \"date\": \"2026-11-09\",\n      \"medicationId\": \"medikinet-adult-10mg\",\n      \"status\": \"complete\",\n      \"step\": 13,\n      \"answers\": {\n        \"q1\": {\n          \"selected\": [\n            \"morning\"\n          ]\n        },\n        \"q2\": {\n          \"selected\": [\n            \"30to60\"\n          ],\n          \"note\": \"Original: Within 30–60 minutes (recorded as 30 to 60 minutes).\"\n        },\n        \"q3\": {\n          \"selected\": [\n            \"clearer\",\n            \"organised\",\n            \"racing\",\n            \"foggy\"\n          ],\n          \"note\": \"Not matched to an option: Happier and more positive; More mentally energetic.\"\n        },\n        \"q4\": {\n          \"selected\": [\n            \"happier\"\n          ],\n          \"note\": \"Original: Noticeably happier (recorded as Happier or more positive).\"\n        },\n        \"q5\": {\n          \"selected\": [\n            \"start\",\n            \"finish\",\n            \"prioritise\"\n          ]\n        },\n        \"q6\": {\n          \"selected\": [\n            \"conversations\",\n            \"return\",\n            \"struggled\"\n          ],\n          \"note\": \"Not matched to an option: Less distracted by external stimuli.\"\n        },\n        \"q7\": {\n          \"selected\": [\n            \"patient\",\n            \"lessimpulsive\",\n            \"lessreactive\",\n            \"calmstress\"\n          ],\n          \"note\": \"Not matched to an option: Less anxious or stressed; More socially confident.\"\n        },\n        \"q8\": {\n          \"selected\": [\n            \"headache\",\n            \"other\"\n          ],\n          \"note\": \"Original: Physical anxiety or tension (no matching option, recorded as Other).\"\n        },\n        \"q9\": {\n          \"selected\": [\n            \"slightly\"\n          ]\n        },\n        \"q10\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q11\": {\n          \"selected\": [\n            \"gradual\"\n          ]\n        },\n        \"q12\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q13\": {\n          \"selected\": [],\n          \"notRecorded\": true\n        },\n        \"q14\": {\n          \"selected\": [\n            \"same\"\n          ]\n        }\n      },\n      \"details\": {\n        \"doseMg\": 10,\n        \"withFood\": true\n      },\n      \"updatedAt\": \"2026-11-18T12:52:47.993Z\"\n    },\n    {\n      \"date\": \"2026-11-10\",\n      \"medicationId\": \"medikinet-adult-10mg\",\n      \"status\": \"complete\",\n      \"step\": 13,\n      \"answers\": {\n        \"q1\": {\n          \"selected\": [\n            \"morning\"\n          ]\n        },\n        \"q2\": {\n          \"selected\": [\n            \"30to60\"\n          ],\n          \"note\": \"Original: Within 30–60 minutes (recorded as 30 to 60 minutes).\"\n        },\n        \"q3\": {\n          \"selected\": [\n            \"organised\",\n            \"foggy\"\n          ],\n          \"note\": \"Original: Still somewhat foggy.\"\n        },\n        \"q4\": {\n          \"selected\": [\n            \"happier\",\n            \"confident\",\n            \"calmer\"\n          ],\n          \"note\": \"Original: More optimistic (recorded with More confident or optimistic); Calmer and more emotionally stable. Not matched to an option: Less anxious or worried; Less irritable or frustrated.\"\n        },\n        \"q5\": {\n          \"selected\": [\n            \"start\",\n            \"prioritise\",\n            \"motivated\"\n          ],\n          \"note\": \"Not matched to an option: Easier to switch between tasks. More productive overall was recorded as More motivated or productive.\"\n        },\n        \"q6\": {\n          \"selected\": [\n            \"return\",\n            \"struggled\",\n            \"wandered\"\n          ],\n          \"note\": \"Not matched to an option: Less distracted by external stimuli.\"\n        },\n        \"q7\": {\n          \"selected\": [\n            \"patient\",\n            \"lessimpulsive\",\n            \"lessreactive\",\n            \"calmstress\",\n            \"tense\"\n          ],\n          \"note\": \"Not matched to an option: Less anxious or worried mentally. \\\"Physical anxiety or tension despite feeling mentally calm\\\" was recorded as More anxious or physically tense.\"\n        },\n        \"q8\": {\n          \"selected\": [\n            \"nausea\",\n            \"headache\",\n            \"sweating\"\n          ],\n          \"note\": \"Original: Stomach discomfort or cramps (recorded as Nausea or stomach discomfort).\"\n        },\n        \"q9\": {\n          \"selected\": [\n            \"slightly\"\n          ]\n        },\n        \"q10\": {\n          \"selected\": [\n            \"4to6\"\n          ],\n          \"note\": \"Original: Strongest effects 3–4 hours after taking the medication (recorded as 2 to 4 hours in). Beneficial effects lasted 4–6 hours.\"\n        },\n        \"q11\": {\n          \"selected\": [\n            \"gradual\"\n          ]\n        },\n        \"q12\": {\n          \"selected\": [\n            \"lessenergy\"\n          ],\n          \"note\": \"Original: Returned gradually to usual baseline; Noticeable drop in energy or motivation. Only the drop is selected because \\\"Felt normal and returned to baseline\\\" cannot be combined with other answers.\"\n        },\n        \"q13\": {\n          \"selected\": [\n            \"irritable\",\n            \"relaxed\"\n          ],\n          \"note\": \"Original: Felt able to relax and unwind normally.\"\n        },\n        \"q14\": {\n          \"selected\": [\n            \"same\"\n          ],\n          \"note\": \"Original: Fell asleep as easily as usual.\"\n        }\n      },\n      \"details\": {\n        \"doseMg\": 10,\n        \"withFood\": true,\n        \"strongest\": \"h2\"\n      },\n      \"updatedAt\": \"2026-11-18T12:52:47.993Z\"\n    }\n  ]\n}";
-  var AUTO_SEED = true;
+
   /** The day after the latest finished day (never later than today): the next day to complete. */
   function nextDayToDo() { var t = today(), done = Object.keys(entries).filter(function (d) { return entries[d].status === 'complete' || entries[d].status === 'awaiting'; }).sort(); if (!done.length) return t; var n = L.addDays(done[done.length - 1], 1); return n < t ? n : t; }
   /** "Day 5": counts from the first diary day. */
@@ -999,7 +1300,7 @@ var Logic = (() => {
   function now() { return new Date().toISOString(); }
   function hhmm() { var d = new Date(); return (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes(); }
   /** Questions 1 to 12 are the same-day diary; 13 and 14 (evening, sleep) are the next-morning check-in. */
-  var APP_VERSION = 44;
+  var APP_VERSION = 45;
   /** The diary has three parts. Part 1: taking the medication (from 7 am). Part 2: while it was active and wearing off (from 5 pm). Part 3: evening and sleep (next morning from 7 am, saved on the day before). */
   var PARTS = {
     1: { from: 0, to: 1, hour: 7, label: 'Taking your medication', short: 'Morning', time: '7 am', done: 'Morning questions done' },
@@ -1048,16 +1349,15 @@ var Logic = (() => {
     return '<div class="qlrow"><span class="tm">' + esc(l.time) + '</span><div style="flex:1;min-width:0">' + items + (l.note ? '<div class="small muted">' + esc(l.note) + '</div>' : '') + rm + '</div></div>';
   }
 
-  // First open on an empty browser: load the person's own first four days (private page). Skipped after "Delete all my data".
-  if (AUTO_SEED && !settings.onboarded && !Object.keys(entries).length && sget('meddiary.noseed') !== '1') {
-    var seed = L.parseBackup(HISTORY_JSON);
-    if (seed.ok && seed.entries.length) { settings = { onboarded: true, medications: seed.medications }; sset(KEY_SETTINGS, JSON.stringify(settings)); seed.entries.forEach(function (x) { entries[x.date] = x; sset(PREFIX + x.date, JSON.stringify(x)); }); }
-  }
   // ---------- view state ----------
   var view = settings.onboarded ? { name: 'tabs', tab: 'home' } : { name: 'onboarding' };
   var ui = { obStep: 0, obName: 'Medikinet', obDose: '', obStart: today(), day: today(), ovDays: 7, ql: null, rmQl: null, toast: '', setMode: 'list', fName: '', fDose: '', fStart: today(), err: '' };
 
   function go(v) { view = v; ui.err = ''; render(true); }
+
+  function syncBannerHtml() {
+    return syncError ? '<div class="banner" role="alert">' + esc(syncError) + ' <button data-action="sync-retry">Retry</button></div>' : '';
+  }
 
   // ---------- shared pieces ----------
   function stepper(id, value, plainDate) {
@@ -1075,19 +1375,20 @@ var Logic = (() => {
     return '<div class="frame"><div class="top">' +
       (o.back ? '<button class="link" data-action="' + o.back + '">‹ ' + esc(o.backLabel || 'Back') + '</button>' : '<span class="link"></span>') +
       (o.skip ? '<button class="link right" data-action="' + o.skip + '" aria-label="Skip this question">Skip ›</button>' : '<span class="link"></span>') +
-      '</div><div class="progress"><p class="ptext">' + esc(o.progressText) + '</p><div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(o.progress * 100) + '"><div class="fill" style="width:' + (o.progress * 100) + '%"></div></div></div>' +
+      '</div>' + syncBannerHtml() + '<div class="progress"><p class="ptext">' + esc(o.progressText) + '</p><div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(o.progress * 100) + '"><div class="fill" style="width:' + (o.progress * 100) + '%"></div></div></div>' +
       '<div class="scroll" id="scroll">' + o.body + '</div>' +
       '<div class="bottom"><button class="btn primary" data-action="' + o.next + '">' + esc(o.nextLabel) + '</button></div></div>';
   }
   function plain(o) {
     return '<div class="frame">' + (o.back ? '<div class="top"><button class="link" data-action="' + o.back + '">‹ ' + esc(o.backLabel || 'Back') + '</button>' + (o.right || '<span class="link"></span>') + '</div>' : '') +
+      syncBannerHtml() +
       '<div class="scroll" id="scroll">' + o.body + '</div>' + (o.bottom ? '<div class="bottom">' + o.bottom + '</div>' : '') + '</div>';
   }
 
   // ---------- onboarding ----------
   function renderOnboarding() {
     var s = ui.obStep, body = '';
-    if (s === 0) body = '<h1 tabindex="-1">Welcome</h1><p>A short daily diary of how your medication affects you.</p><p>Everything stays in this browser on your phone.</p><p>This is a personal diary, not medical advice.</p><div class="sep"><button class="btn" data-action="ob-import">I have an export to restore</button></div>';
+    if (s === 0) body = '<h1 tabindex="-1">Welcome</h1><p>A short daily diary of how your medication affects you.</p><p>Your data syncs directly and privately to your cloud database.</p><p>This is a personal diary, not medical advice.</p><div class="sep"><button class="btn" data-action="ob-import">I have an export to restore</button></div>';
     if (s === 1) body = '<h1 tabindex="-1">Which medication do you take?</h1>' + field('ob-name', 'Medication', ui.obName, { caps: true }) + (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '');
     if (s === 2) body = '<h1 tabindex="-1">What is your dose?</h1>' + field('ob-dose', 'Dose (mg)', ui.obDose, { mode: 'decimal', hint: 'One dose a day. You can change it later in Settings.' }) + (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '');
     if (s === 3) body = '<h1 tabindex="-1">When did you start?</h1><p>Choose the first day you took it.</p>' + stepper('ob-start', ui.obStart);
@@ -1103,14 +1404,12 @@ var Logic = (() => {
     if (view.tab === 'overview') body = overviewBody();
     if (view.tab === 'settings') body = settingsBody();
     var title = TABS.filter(function (t) { return t[0] === view.tab; })[0][1];
-    var banner = storageOk ? '' : '<div class="banner" role="alert">This browser is not saving data. Your answers will be lost when you close the page. Export a backup before you leave.</div>';
+    var banner = syncBannerHtml();
     function tabBtn(t) { return '<button class="tab" role="tab" aria-selected="' + (t[0] === view.tab) + '" data-action="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }
     return '<div class="frame">' + '<div class="head"><h1>' + title + '</h1>' + (view.tab === 'home' ? '<span class="hdate">' + esc(L.formatLong(today())) + '</span>' : '') + '</div>' + banner + '<div class="scroll" id="scroll">' + body + '</div><nav class="tabs" role="tablist">' +
       tabBtn(TABS[0]) + tabBtn(TABS[1]) + '<div class="logwrap"><button class="logbtn" data-action="ql-open" aria-label="Log a symptom or effect">+</button><span class="logcap" aria-hidden="true">Log</span></div>' + tabBtn(TABS[2]) + tabBtn(TABS[3]) + '</nav></div>';
   }
-  function unsavedDays() {
-    return entryList().filter(function (e) { return e.status === 'complete' && (!meta.lastExportAt || (e.completedAt || e.updatedAt) > meta.lastExportAt); }).length;
-  }
+  function unsavedDays() { return 0; }
   function dn0() { return dayNumber(today()); }
   function logsBlock() {
     var logs = logsOn(ui.day), isToday = ui.day === today();
@@ -1141,11 +1440,10 @@ var Logic = (() => {
     ui.day = today();
     var med = currentMed(), e = entries[ui.day], t = today(), isToday = true, h = new Date().getHours();
     var out = '', yd = L.addDays(t, -1), ye = entries[yd], first = Object.keys(entries).sort()[0];
-    // 2. the day card with its parts
     var dn = dayNumber(ui.day), rel = isToday ? 'Today' : ui.day === yd ? 'Yesterday' : '', title = dn > 0 && Object.keys(entries).length ? (rel ? rel + ' · ' : '') + 'Day ' + dn : (rel || L.formatShort(ui.day));
     var nParts = [1, 2, 3].filter(function (n) { return partDone(e, n); }).length, shown = [1, 2, 3];
     var doneShown = shown.filter(function (n) { return partDone(e, n); }).length;
-    var card = '<div class="dayhead" style="position:relative">' + 
+    var card = '<div class="dayhead" style="position:relative">' +
       '<h2>' + esc(rel || L.formatShort(ui.day)) + '</h2>' + (dn > 0 && Object.keys(entries).length ? '<p class="muted small" style="margin:0 0 4px">Day ' + dn + '</p>' : '') + '</div>' +
       shown.map(function (n) { return partRow(ui.day, n, e); }).join('') +
       (nParts > 0 ? '<button class="btn" data-action="open-day" data-date="' + ui.day + '">View summary</button>' : '');
@@ -1157,7 +1455,7 @@ var Logic = (() => {
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function calMonths() {
     var t = new Date(today() + 'T00:00:00'), ty = t.getFullYear(), tm = t.getMonth();
-    var keys = Object.keys(entries).sort(), sy = ty, sm = tm - 2;           // always at least two earlier months to swipe back to
+    var keys = Object.keys(entries).sort(), sy = ty, sm = tm - 2;
     if (sm < 0) { sm += 12; sy -= 1; }
     if (keys.length) { var f = keys[0].split('-'); var fy = +f[0], fm = +f[1] - 1; if (fy < sy || (fy === sy && fm < sm)) { sy = fy; sm = fm; } }
     var out = [], y = sy, m = sm;
@@ -1236,12 +1534,11 @@ var Logic = (() => {
         (!isDose && cur ? '<p class="muted small">' + esc(cur.name) + ' will be marked as stopped the day before.</p>' : '') + (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '') +
         '<button class="btn primary" data-action="' + (isDose ? 'save-dose' : 'save-new') + '">Save</button><button class="btn" data-action="set-cancel">Cancel</button>';
     }
-    var n = unsavedDays();
-    return '<div class="card" style="margin-top:8px"><p class="small muted" style="margin:0 0 8px">App version ' + APP_VERSION + '. Your entries are kept when you reload.</p><p class="small muted" style="margin:0 0 8px"><b>' + Object.keys(entries).length + '</b> days are saved in this browser. If this number suddenly drops to 4, the browser cleared its storage: import your latest backup.</p><button class="btn" data-action="reload-app">Reload latest version</button></div>' + (n >= 3 ? '<div class="banner" style="margin-top:8px">' + plural(n, 'finished day is', 'finished days are') + ' not backed up yet. <button data-action="export-json">Back up now</button></div>' : '') + '<div class="label-up" style="margin-top:8px">Your medication</div>' + meds.map(function (m) {
+    return '<div class="card" style="margin-top:8px"><p class="small muted" style="margin:0 0 8px">App version ' + APP_VERSION + '.</p><p class="small muted" style="margin:0 0 8px"><b>' + Object.keys(entries).length + '</b> days are safely synced to your Supabase cloud.</p><button class="btn" data-action="reload-app">Reload latest version</button></div>' + '<div class="label-up" style="margin-top:8px">Your medication</div>' + meds.map(function (m) {
       var isCur = cur && m.id === cur.id;
       return '<div class="card" style="position:relative">' + (isCur ? '<button class="editic" data-action="set-dose" aria-label="Edit the dose of ' + esc(m.name) + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' : '') + '<h2' + (isCur ? ' style="padding-right:44px"' : '') + '>' + esc(m.name) + ' · ' + m.doseMg + ' mg</h2><p class="muted small" style="margin:0">' + esc(L.formatLong(m.startDate)) + ' to ' + (m.endDate ? esc(L.formatLong(m.endDate)) : 'now') + '</p></div>';
     }).join('') + '<button class="btn" data-action="set-new">Add a new medication</button>' +
-      '<div class="label-up">Your data</div><div class="card"><p class="small" style="margin:0">Everything is stored only in this browser on this phone. There are no accounts and no servers. If you clear website data or switch phones, the diary is gone, so export a backup now and then.' +
+      '<div class="label-up">Your data</div><div class="card"><p class="small" style="margin:0">Your diary is synced to your personal Supabase database. You are currently authenticated. Keep a backup now and then just in case.' +
       (meta.lastExportAt ? ' Last backup: ' + esc(new Date(meta.lastExportAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })) + '.' : ' You have not made a backup yet.') + '</p></div>' +
       '<button class="btn" data-action="import">Import data</button><button class="btn" data-action="export-json">Export backup (JSON)</button><button class="btn" data-action="report">Summary for my doctor (PDF)</button>' +
       '<div class="label-up">Good to know</div><div class="card"><p class="small" style="margin:0">This is a personal diary, not medical advice. Don\'t change your medication because of it. Talk to your prescriber, and call emergency services for chest pain, fainting or trouble breathing.</p></div><button class="btn danger" data-action="set-wipe" style="margin-top:24px">Delete all my data</button>';
@@ -1307,7 +1604,7 @@ var Logic = (() => {
   function startSame(date, n) {
     var src = copySource(date, n); if (!src) return;
     var P = PARTS[n], prev = entries[date] ? JSON.parse(JSON.stringify(entries[date])) : null;
-    ui.sameRestore = prev || { date: date, none: true };      // so Back can undo
+    ui.sameRestore = prev || { date: date, none: true };
     var m = medOn(date), answers = prev ? JSON.parse(JSON.stringify(prev.answers)) : {}, details = prev ? Object.assign({}, prev.details) : (m ? { doseMg: m.doseMg } : {});
     L.QUESTIONS.slice(P.from, P.to + 1).forEach(function (q) { var a = src.answers[q.id]; if (!answers[q.id] && a && !a.notRecorded && a.selected.length) answers[q.id] = { selected: a.selected.slice() }; });
     if (n === 1 && details.withFood === undefined && src.details.withFood !== undefined) details.withFood = src.details.withFood;
@@ -1361,482 +1658,4 @@ var Logic = (() => {
   function moreOpts(val) {
     var out = [], seen = {};
     QL_DIFF.concat(QL_HELP).forEach(function (x) { seen[x[0] + '.' + x[1]] = 1; });
-    ['q3', 'q4', 'q6', 'q7', 'q8', 'q9'].forEach(function (qid) { L.QUESTION_BY_ID[qid].options.forEach(function (o) { if (o.valence === val && !o.exclusive && !seen[qid + '.' + o.id] && o.id !== 'other') out.push([qid, o.id]); }); });
-    return out;
-  }
-  function recentTags() {
-    var m = {};
-    allQuickLogs().sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; }).forEach(function (l) { l.items.forEach(function (it) { var k = it.q + '.' + it.o, r = m[k] || (m[k] = { pair: [it.q, it.o], n: 0, hours: {}, last: '' }); r.n++; r.last = l.createdAt; var h = l.time.slice(0, 2); r.hours[h] = (r.hours[h] || 0) + 1; }); });
-    return Object.keys(m).map(function (k) { var r = m[k]; r.hour = Object.keys(r.hours).sort(function (a, b) { return r.hours[b] - r.hours[a] || (a < b ? -1 : 1); })[0]; return r; }).filter(function (r) { return optOf(r.pair[0], r.pair[1]); }).sort(function (a, b) { return b.n - a.n || (a.last < b.last ? 1 : -1); }).slice(0, 8);
-  }
-  function qchip(pair, val, suffix) {
-    var o = optOf(pair[0], pair[1]); if (!o) return '';
-    var on = !!ui.ql.sel[pair[0] + '.' + pair[1]];
-    return '<button type="button" class="qchip ' + VAL[val] + '" role="checkbox" aria-checked="' + on + '" data-action="ql-toggle" data-k="' + pair[0] + '.' + pair[1] + '">' + (on ? (val === 'positive' ? '+ ' : '! ') : '') + esc(o.label) + (suffix ? ' <span class="small" style="font-weight:400">' + esc(suffix) + '</span>' : '') + '</button>';
-  }
-  function qlSheet() {
-    var q = ui.ql, rc = recentTags(), dl = QL_DIFF.slice(), hl = QL_HELP.slice();
-    if (q.moreD) dl = dl.concat(moreOpts('negative')); if (q.moreH) hl = hl.concat(moreOpts('positive'));
-    var html = '<div class="overlay"><button class="backdrop" data-action="ql-close" aria-label="Close"></button><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ql-h"><div class="grab"></div>' +
-      '<div class="shead"><h2 id="ql-h" tabindex="-1">Log how you feel now</h2><button class="link right" data-action="ql-close">Cancel</button></div>' +
-      '<div class="chips" role="radiogroup" aria-label="When" style="margin:8px 0 12px"><span class="small muted" style="align-self:center">When</span><button class="chip" role="radio" aria-checked="' + (q.when === 'now') + '" data-action="ql-when" data-w="now">Now</button><button class="chip" role="radio" aria-checked="' + (q.when === 'earlier') + '" data-action="ql-when" data-w="earlier">Pick a time</button></div>' +
-      (q.when === 'earlier' ? '<div class="field"><label for="ql-time">Time</label><input class="input" id="ql-time" type="time" data-bind="ql-time" value="' + esc(q.time || hhmm()) + '"></div>' : '') +
-      (rc.length ? '<div style="margin:8px 0"><b>Logged before</b></div><div class="qchips">' + rc.map(function (r) { var o = optOf(r.pair[0], r.pair[1]); return qchip(r.pair, o.valence, (r.n > 1 ? r.n + '×' : '')); }).join('') + '</div>' : '') +
-      '<div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px">' + icon('negative', true) + '<b>Difficult</b></div><div class="qchips">' + dl.map(function (x) { return qchip(x, 'negative'); }).join('') + (q.moreD ? '' : '<button type="button" class="qchip plain" data-action="ql-more" data-w="D">More…</button>') + '</div>' +
-      '<div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px">' + icon('positive', true) + '<b>Helped</b></div><div class="qchips">' + hl.map(function (x) { return qchip(x, 'positive'); }).join('') + (q.moreH ? '' : '<button type="button" class="qchip plain" data-action="ql-more" data-w="H">More…</button>') + '</div>' +
-      (q.noteOpen || q.note ? '<div class="field" style="margin-top:12px"><label for="ql-note">Note (optional)</label><textarea class="input" id="ql-note" data-bind="ql-note" maxlength="500">' + esc(q.note) + '</textarea></div>' : '<button class="notebtn" data-action="ql-note">+ Add a note</button>') +
-      (q.err ? '<p class="err" role="alert">' + esc(q.err) + '</p>' : '') + '<button class="btn primary" data-action="ql-save" style="margin-top:8px">Save log</button></div></div>';
-    return html;
-  }
-
-  // ---------- summary for the doctor (report model, preview, PDF) ----------
-  function tallyOf(map) { return Object.keys(map).map(function (k) { return { label: k, n: map[k] }; }).sort(function (a, b) { return b.n - a.n || (a.label < b.label ? -1 : 1); }); }
-  function countText(rows, base) { return rows.map(function (r) { return { t: r.label, m: r.n + (base ? ' of ' + base : '') + ((base || r.n) === 1 ? ' day' : ' days') }; }); }
-  function itemText(x) { return typeof x === 'string' ? x : x.t + (x.m ? ' (' + x.m + ')' : ''); }
-  function pickLabel(e, p) { if (p.o.id !== 'other') return p.o.label; var a = e && e.answers[p.q.id], n = a && a.note ? a.note.trim() : ''; return n ? 'Other: ' + n : 'Other (not specified)'; }
-  function buildReport() {
-    var diary = entryList().slice().reverse().filter(function (e) { return Object.keys(e.answers).some(function (k) { return L.isAnswered(e.answers[k]); }); });
-    var logsAll = allQuickLogs();
-    if (!diary.length && !logsAll.length) return null;
-    var N = diary.length, dates = {}, perDay = {}, notRec = 0;
-    diary.forEach(function (e) { dates[e.date] = 1; if (Object.keys(e.answers).some(function (k) { return e.answers[k] && e.answers[k].notRecorded; })) notRec++; });
-    logsAll.forEach(function (l) { dates[l.date] = 1; });
-    var D = Object.keys(dates).length, ds = Object.keys(dates).sort();
-    function addPick(date, q, o) { if (o.valence === 'neutral' || o.id === 'other') return; var m = perDay[date] || (perDay[date] = {}); m[q.id + '.' + o.id] = { q: q, o: o }; }
-    diary.forEach(function (e) { var g = L.groupByValence(e); g.positive.concat(g.negative).forEach(function (p) { addPick(e.date, p.q, p.o); }); });
-    logsAll.forEach(function (l) { l.items.forEach(function (it) { var o = optOf(it.q, it.o); if (o) addPick(l.date, L.QUESTION_BY_ID[it.q], o); }); });
-    var tally = {};
-    Object.keys(perDay).forEach(function (d) { Object.keys(perDay[d]).forEach(function (k) { var p = perDay[d][k], t = tally[k] || (tally[k] = { q: p.q, o: p.o, n: 0 }); t.n++; }); });
-    var rows = Object.keys(tally).map(function (k) { return tally[k]; }).sort(function (a, b) { return b.n - a.n || (a.o.label < b.o.label ? -1 : 1); });
-    var pos = rows.filter(function (r) { return r.o.valence === 'positive'; }), neg = rows.filter(function (r) { return r.o.valence === 'negative'; });
-    function qTally(qid) { var m = {}, base = 0; diary.forEach(function (e) { var a = e.answers[qid]; if (!a || !a.selected.length) return; base++; a.selected.forEach(function (id) { var o = optOf(qid, id); var l = o ? o.label : id; m[l] = (m[l] || 0) + 1; }); }); return { rows: tallyOf(m), base: base }; }
-    function line(label, qid) { var t = qTally(qid); return t.base ? { k: 'kv', a: label, b: countText(t.rows, t.base) } : null; }
-    var S = [];
-    // Medication
-    var meds = settings.medications.slice().sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
-    var sm = { title: 'Medication', lines: [] };
-    meds.forEach(function (m) { sm.lines.push({ k: 'li', t: m.name + ', ' + m.doseMg + ' mg · from ' + L.formatLong(m.startDate) + (m.endDate ? ' to ' + L.formatLong(m.endDate) : ' (current)') }); });
-    if (!meds.length) sm.lines.push({ k: 'p', t: 'No medication entered.' });
-    S.push(sm);
-    // Dose
-    var sd = { title: 'Dose', lines: [] }, doses = {}, food = {};
-    diary.forEach(function (e) { if (e.details.doseMg !== undefined) doses[e.details.doseMg + ' mg'] = (doses[e.details.doseMg + ' mg'] || 0) + 1; if (e.details.withFood === true) food['with or after food'] = (food['with or after food'] || 0) + 1; else if (e.details.withFood === false) food['not with food'] = (food['not with food'] || 0) + 1; });
-    if (Object.keys(doses).length) sd.lines.push({ k: 'kv', a: 'Dose taken', b: countText(tallyOf(doses), N) });
-    if (Object.keys(food).length) sd.lines.push({ k: 'kv', a: 'With food', b: countText(tallyOf(food), N) });
-    if (meds.length > 1 || meds.some(function (m) { return m.endDate; })) sd.lines.push({ k: 'p', t: 'The dose or medication changed during this period, see Medication above.' });
-    if (!sd.lines.length) sd.lines.push({ k: 'p', t: 'No dose details were recorded.' });
-    S.push(sd);
-    // Timing
-    var st = { title: 'Timing', lines: [] };
-    [['When taken', 'q1'], ['First effect', 'q2'], ['Beneficial effect lasted', 'q10'], ['When it wore off', 'q11'], ['Afterwards, compared with baseline', 'q12']].forEach(function (x) { var l = line(x[0], x[1]); if (l) st.lines.push(l); });
-    var strong = {}, times = [];
-    diary.forEach(function (e) { if (e.details.strongest) { var so = L.STRONGEST_OPTIONS.filter(function (z) { return z.id === e.details.strongest; })[0]; if (so) strong[so.label] = (strong[so.label] || 0) + 1; } if (e.details.takenTime) times.push(e.details.takenTime); });
-    if (Object.keys(strong).length) st.lines.push({ k: 'kv', a: 'Strongest effect', b: countText(tallyOf(strong), N) });
-    if (times.length) st.lines.push({ k: 'kv', a: 'Exact time taken', b: times.sort().map(function (x) { return { t: x }; }) });
-    if (!st.lines.length) st.lines.push({ k: 'p', t: 'No timing answers were recorded.' });
-    S.push(st);
-    // Timeline
-    var tl = { title: 'Timeline', lines: [] };
-    ds.forEach(function (d) {
-      var e = entries[d], logs = logsOn(d), dn = dayNumber(d);
-      tl.lines.push({ k: 'h3', t: (dn && e ? 'Day ' + dn + ' · ' : '') + L.formatLong(d) + (e && e.copiedFrom ? ' · same as previous day' : '') });
-      if (e) {
-        var tk = L.timingLines(e).map(function (x) { return x.label + ': ' + x.value; }).join(' · ');
-        if (tk) tl.lines.push({ k: 'p', t: tk });
-        var g = L.groupByValence(e);
-        if (g.positive.length) tl.lines.push({ k: 'p', t: 'Helped: ' + g.positive.map(function (p) { return pickLabel(e, p); }).join('; ') });
-        if (g.negative.length) tl.lines.push({ k: 'p', t: 'Difficult: ' + g.negative.map(function (p) { return pickLabel(e, p); }).join('; ') });
-        if (e.status === 'awaiting') tl.lines.push({ k: 'p', t: 'Evening and sleep not answered yet.' });
-      }
-      logs.forEach(function (l) { tl.lines.push({ k: 'p', t: 'Quick log ' + l.time + ': ' + l.items.map(function (it) { var o = optOf(it.q, it.o); return o ? (o.valence === 'positive' ? '+ ' : o.valence === 'negative' ? '! ' : '') + o.label : ''; }).join('; ') + (l.note ? ' (' + l.note + ')' : '') }); });
-    });
-    // Symptoms
-    var sy = { title: 'Positive and negative symptoms', lines: [{ k: 'p', t: 'Number of days each was reported, out of ' + plural(D, 'day', 'days') + ' with entries (diary and quick logs).' }, { k: 'h3', v: 'pos', t: 'Positive: what helped' }] };
-    pos.slice(0, 10).forEach(function (r) { sy.lines.push({ k: 'li', v: 'pos', t: r.o.label, m: r.q.short + ' · ' + r.n + ' of ' + D + ' days' }); });
-    if (!pos.length) sy.lines.push({ k: 'p', t: 'Nothing positive was recorded.' });
-    sy.lines.push({ k: 'h3', v: 'neg', t: 'Negative: what was difficult' });
-    neg.slice(0, 10).forEach(function (r) { sy.lines.push({ k: 'li', v: 'neg', t: r.o.label, m: r.q.short + ' · ' + r.n + ' of ' + D + ' days' }); });
-    if (!neg.length) sy.lines.push({ k: 'p', t: 'Nothing difficult was recorded.' });
-    S.push(sy);
-    // Patterns (counted from entries only)
-    var pt = { title: 'Other patterns noticed', lines: [] };
-    var on = qTally('q2'), du = qTally('q10');
-    if (on.base && on.rows[0].n >= 2) pt.lines.push({ k: 'li', t: 'First effect most often: ' + on.rows[0].label, m: on.rows[0].n + ' of ' + on.base + ' days' });
-    if (du.base && du.rows[0].n >= 2) pt.lines.push({ k: 'li', t: 'Beneficial effect most often lasted: ' + du.rows[0].label, m: du.rows[0].n + ' of ' + du.base + ' days' });
-    neg.filter(function (r) { return r.n >= 2 && r.n * 2 >= D; }).slice(0, 4).forEach(function (r) { pt.lines.push({ k: 'li', v: 'neg', t: 'Recurring difficulty: ' + r.o.label, m: r.n + ' of ' + D + ' days' }); });
-    pos.filter(function (r) { return r.n >= 2 && r.n * 2 >= D; }).slice(0, 4).forEach(function (r) { pt.lines.push({ k: 'li', v: 'pos', t: 'Recurring benefit: ' + r.o.label, m: r.n + ' of ' + D + ' days' }); });
-    [['After the medication wore off', 'q11'], ['Afterwards', 'q12'], ['Appetite and drinking', 'q9'], ['Sleep', 'q14'], ['Evening', 'q13']].forEach(function (x) {
-      var m = {}, base = 0; diary.forEach(function (e) { var a = e.answers[x[1]]; if (!a || !a.selected.length) return; base++; a.selected.forEach(function (id) { var o = optOf(x[1], id); if (o && o.valence === 'negative') m[o.label] = (m[o.label] || 0) + 1; }); });
-      tallyOf(m).filter(function (r) { return r.n >= 2; }).slice(0, 3).forEach(function (r) { pt.lines.push({ k: 'li', v: 'neg', t: x[0] + ': ' + r.label, m: r.n + ' of ' + base + ' days' }); });
-    });
-    var ql = {}; logsAll.forEach(function (l) { l.items.forEach(function (it) { var k = it.q + '.' + it.o, r = ql[k] || (ql[k] = { n: 0, h: {}, o: optOf(it.q, it.o) }); r.n++; var h = l.time.slice(0, 2); r.h[h] = (r.h[h] || 0) + 1; }); });
-    Object.keys(ql).map(function (k) { return ql[k]; }).filter(function (r) { return r.o && r.n >= 2; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 5).forEach(function (r) {
-      var hs = Object.keys(r.h).sort(function (a, b) { return r.h[b] - r.h[a] || (a < b ? -1 : 1); }), h = hs[0], nx = (Number(h) + 1 < 10 ? '0' : '') + (Number(h) + 1);
-      pt.lines.push({ k: 'li', t: 'Quick log: ' + r.o.label + (r.h[h] >= 2 ? ', most often between ' + h + ':00 and ' + nx + ':00' : ', at different times of day'), m: r.n + ' times' + (r.h[h] >= 2 ? ' · ' + r.h[h] + ' in that hour' : '') });
-    });
-    if (notRec) pt.lines.push({ k: 'li', t: 'Some questions were not asked or not recorded. They are not counted as "no symptoms".', m: plural(notRec, 'day', 'days') });
-    if (!pt.lines.length) pt.lines.push({ k: 'p', t: 'Not enough entries yet to see a pattern. A pattern needs the same thing on at least 2 days.' });
-    S.push(pt);
-    return { title: 'Medication diary: summary for my doctor', generated: today(), period: L.formatLong(ds[0]) + (ds.length > 1 ? ' to ' + L.formatLong(ds[ds.length - 1]) : ''), days: D, diaryDays: N, quickLogs: logsAll.length, sections: S };
-  }
-  function reportText(r) {
-    var out = [r.title, 'Prepared ' + L.formatLong(r.generated) + ' · Period: ' + r.period + ' · ' + plural(r.diaryDays, 'diary day', 'diary days') + ', ' + plural(r.quickLogs, 'quick log', 'quick logs'), ''];
-    r.sections.forEach(function (s) { out.push(s.title.toUpperCase()); s.lines.forEach(function (l) { out.push(l.k === 'li' ? '- ' + itemText(l) : l.k === 'kv' ? l.a + ':\n' + l.b.map(function (x) { return '  - ' + itemText(x); }).join('\n') : l.k === 'h3' ? '\n' + l.t : l.t); }); out.push(''); });
-    out.push('Counted automatically from my own diary entries. This is not a diagnosis or medical advice.');
-    return out.join('\n');
-  }
-  function renderReport() {
-    var r = buildReport();
-    if (!r) return plain({ back: 'rep-close', body: '<h1 tabindex="-1">Summary for my doctor</h1><p class="muted">There is nothing to summarise yet. Log a day first.</p>' });
-    var body = '<h1 tabindex="-1">Summary for my doctor</h1><p class="muted">' + esc(r.period) + ' · ' + plural(r.diaryDays, 'diary day', 'diary days') + ', ' + plural(r.quickLogs, 'quick log', 'quick logs') + '. Check it, then save it as a PDF.</p>' +
-      (downloads ? '<button class="btn primary" data-action="rep-save">Save as PDF</button>' : '<p class="muted small">Saving a file is not available here.</p>') + '<button class="btn" data-action="rep-copy">Copy as text</button>' +
-      (view.msg ? '<p class="' + (view.msgOk ? 'ok' : 'err') + '" role="status">' + esc(view.msg) + '</p>' : '');
-    r.sections.forEach(function (s) {
-      body += '<div class="label-up">' + esc(s.title) + '</div><div class="card">' + s.lines.map(function (l) {
-        return l.k === 'kv' ? '<p style="margin:0 0 2px"><b>' + esc(l.a) + '</b></p>' + l.b.map(function (x) { return '<p style="margin:0 0 4px 12px">• ' + esc(x.t) + (x.m ? ' <span class="muted small">' + esc(x.m) + '</span>' : '') + '</p>'; }).join('') + '<div style="height:8px"></div>' : l.k === 'h3' ? '<p style="margin:12px 0 4px"><b>' + esc(l.t) + '</b></p>' : l.k === 'li' ? '<p style="margin:0 0 6px">• ' + esc(l.t) + (l.m ? ' <span class="muted small">' + esc(l.m) + '</span>' : '') + '</p>' : '<p style="margin:0 0 6px">' + esc(l.t) + '</p>';
-      }).join('') + '</div>';
-    });
-    return plain({ back: 'rep-close', body: body + '<p class="muted small">Counted automatically from your own entries. This is not a diagnosis or medical advice.</p>' });
-  }
-  // --- minimal PDF writer (A4, Helvetica, text only; no libraries) ---
-  var HW = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
-  var WIN = { 8211: 150, 8212: 151, 8216: 145, 8217: 146, 8220: 147, 8221: 148, 8226: 149, 8230: 133 };
-  function winCode(c) { if (c < 128) return c; if (c >= 160 && c <= 255) return c; return WIN[c] || (c === 8203 ? 0 : 63); }
-  function winStr(t) { var o = ''; for (var i = 0; i < t.length; i++) { var c = winCode(t.charCodeAt(i)); if (c) o += String.fromCharCode(c); } return o; }
-  function tw(t, size, bold) { var w = 0; for (var i = 0; i < t.length; i++) { var c = t.charCodeAt(i); w += (c >= 32 && c < 127 ? HW[c - 32] : 556); } return w * size / 1000 * (bold ? 1.07 : 1); }
-  function pdfEsc(t) { return t.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); }
-  function wrap(t, size, bold, width) {
-    var words = winStr(t).split(' '), lines = [], cur = '';
-    words.forEach(function (w) { var tryL = cur ? cur + ' ' + w : w; if (tw(tryL, size, bold) <= width || !cur) cur = tryL; else { lines.push(cur); cur = w; } });
-    if (cur) lines.push(cur); return lines;
-  }
-  function pdfBytes(r) {
-    var W = 595.28, H = 841.89, M = 54, CW = W - 2 * M, pages = [[]], y = M;
-    var INK = '0.10 0.13 0.17', ACC = '0.18 0.27 0.36', MUT = '0.40 0.45 0.51', LIGHT = '0.50 0.54 0.60', POS = '0.14 0.46 0.28', NEG = '0.72 0.31 0.04';
-    function ops() { return pages[pages.length - 1]; }
-    function need(h) { if (y + h > H - M - 14) { pages.push([]); y = M; } }
-    function text(t, size, bold, x, col, tc) { ops().push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + (tc || 0) + ' Tc ' + (col || INK) + ' rg ' + x.toFixed(2) + ' ' + (H - y - size).toFixed(2) + ' Td (' + pdfEsc(t) + ') Tj ET'); }
-    function para(t, size, bold, indent, col, gap, lhm) { var ls = wrap(t, size, bold, CW - indent), lh = size * (lhm || 1.4); ls.forEach(function (l) { need(lh); text(l, size, bold, M + indent, col); y += lh; }); y += (gap === undefined ? 3 : gap); }
-    function rule(col) { ops().push((col || '0.86 0.87 0.89') + ' RG 0.7 w ' + M + ' ' + (H - y).toFixed(2) + ' m ' + (W - M) + ' ' + (H - y).toFixed(2) + ' l S'); y += 8; }
-    function label(t, col) { need(22); y += 9; text(winStr(t).toUpperCase(), 8, true, M, col || MUT, 0.7); y += 14; }
-    function item(it, col) {
-      var t = it.t || it, m = it.m || '', ind = 14, size = 11, lh = size * 1.42, ls = wrap(t, size, false, CW - ind);
-      ls.forEach(function (x, i) {
-        need(lh);
-        if (i === 0) { ops().push(col + ' rg ' + (M + 3).toFixed(2) + ' ' + (H - y - size + 3.2).toFixed(2) + ' 3 3 re f'); }
-        text(x, size, false, M + ind, INK);
-        if (i === ls.length - 1 && m) { var wx = tw(x, size, false); if (wx + 8 + tw(m, 8.5, false) <= CW - ind) { y -= 0; ops().push('BT /F1 8.5 Tf 0 Tc ' + LIGHT + ' rg ' + (M + ind + wx + 7).toFixed(2) + ' ' + (H - y - size).toFixed(2) + ' Td (' + pdfEsc(winStr(m)) + ') Tj ET'); } else { y += lh - 2; need(12); text(winStr(m), 8.5, false, M + ind, LIGHT); y -= 1; } }
-        y += lh;
-      });
-      y += 2;
-    }
-    text(winStr(r.title), 22, true, M, ACC); y += 30;
-    para('Prepared ' + L.formatLong(r.generated) + ' from my own diary entries', 9.5, false, 0, MUT, 1);
-    para('Period: ' + r.period + ' · ' + r.diaryDays + ' diary days · ' + r.quickLogs + ' quick logs', 9.5, false, 0, MUT, 4);
-    ops().push('0.18 0.27 0.36 RG 1.4 w ' + M + ' ' + (H - y).toFixed(2) + ' m ' + (W - M) + ' ' + (H - y).toFixed(2) + ' l S'); y += 10;
-    r.sections.forEach(function (s) {
-      need(70); y += 12; text(winStr(s.title), 14, true, M, ACC); y += 20; rule();
-      s.lines.forEach(function (l) {
-        if (l.k === 'h3') { label(l.t, l.v === 'pos' ? POS : l.v === 'neg' ? NEG : MUT); }
-        else if (l.k === 'li') item(l, l.v === 'pos' ? POS : l.v === 'neg' ? NEG : LIGHT);
-        else if (l.k === 'kv') { label(l.a); l.b.forEach(function (it) { item(it, LIGHT); }); }
-        else para(l.t, 9.5, false, 0, MUT, 4);
-      });
-    });
-    y += 14; need(30); rule(); para('Counted automatically from my own diary entries. This is not a diagnosis or medical advice.', 8.5, false, 0, LIGHT, 0);
-    var total = pages.length;
-    pages.forEach(function (p, i) { p.push('BT /F1 8 Tf 0 Tc 0.58 0.62 0.67 rg ' + M + ' 28 Td (Med Diary · ' + r.generated + ' · page ' + (i + 1) + ' of ' + total + ') Tj ET'); });
-    var objs = [], pageIds = [];
-    objs[1] = '<< /Type /Catalog /Pages 2 0 R >>'; objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'; objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
-    pages.forEach(function (p, i) { var cid = 5 + i * 2, pid = 6 + i * 2, body = p.join('\n').replace(/·/g, '\xB7'); body = body.split('').map(function (ch) { return ch.charCodeAt(0) > 255 ? '?' : ch; }).join(''); objs[cid] = '<< /Length ' + body.length + ' >>\nstream\n' + body + '\nendstream'; objs[pid] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + cid + ' 0 R >>'; pageIds.push(pid + ' 0 R'); });
-    objs[2] = '<< /Type /Pages /Kids [' + pageIds.join(' ') + '] /Count ' + total + ' >>';
-    objs.push('<< /Title (Medication diary summary) /Producer (Med Diary) >>'); var infoId = objs.length - 1;
-    var out = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', offs = [];
-    for (var i = 1; i < objs.length; i++) { offs[i] = out.length; out += i + ' 0 obj\n' + objs[i] + '\nendobj\n'; }
-    var xr = out.length; out += 'xref\n0 ' + objs.length + '\n0000000000 65535 f \n';
-    for (var j = 1; j < objs.length; j++) out += ('0000000000' + offs[j]).slice(-10) + ' 00000 n \n';
-    out += 'trailer\n<< /Size ' + objs.length + ' /Root 1 0 R /Info ' + infoId + ' 0 R >>\nstartxref\n' + xr + '\n%%EOF';
-    var u = new Uint8Array(out.length); for (var k = 0; k < out.length; k++) u[k] = out.charCodeAt(k) & 255; return u;
-  }
-
-  // ---------- import ----------
-  function renderImport() {
-    var v = view, body, bottom;
-    if (v.stage === 'done') v = { name: 'import', text: '', error: null, plan: null };
-    body = '<h1 tabindex="-1">Import data</h1><p class="muted">Choose a Med Diary backup file, or paste its text. You will see what it contains before anything is saved.</p>' +
-      '<button class="btn" data-action="imp-fill">Use my Medikinet days 1 to 4</button><div class="field"><label for="imp-file">Backup file</label><input class="input" id="imp-file" type="file" accept=".json,application/json,text/plain"></div>' +
-      '<div class="field"><label for="imp-text">Or paste the text</label><textarea class="input" id="imp-text" data-bind="imp-text" autocapitalize="none" autocorrect="off" spellcheck="false">' + esc(v.text) + '</textarea></div>';
-    if (v.error) body += '<p class="err" role="alert">' + esc(v.error) + '</p>';
-    var p = v.plan;
-    if (p) {
-      var nothing = !p.newDays.length && !p.conflicts.length && !p.newMedications.length && !p.newQuickLogs.length;
-      body += '<h2 style="margin:16px 0 8px">What will happen</h2><p>' + plural(p.newDays.length, 'new day', 'new days') + ' will be added.</p>' +
-        (p.newQuickLogs.length ? '<p>' + plural(p.newQuickLogs.length, 'quick log', 'quick logs') + ' will be added.</p>' : '') + (p.sameCount ? '<p>' + plural(p.sameCount, 'day is', 'days are') + ' already here and identical. Nothing changes.</p>' : '') +
-        (p.newMedications.length ? '<p>' + plural(p.newMedications.length, 'medication', 'medications') + ' will be added.</p>' : '') +
-        (p.keptMedications ? '<p>' + plural(p.keptMedications, 'medication is', 'medications are') + ' already here and will be kept as they are.</p>' : '') +
-        (p.unreadable ? '<p class="err">' + plural(p.unreadable, 'record', 'records') + ' could not be read and will be left out.</p>' : '');
-      if (p.conflicts.length) {
-        body += '<h2 style="margin:20px 0 4px">' + plural(p.conflicts.length, 'day differs', 'days differ') + ' from this browser</h2><p class="muted small">' + esc(p.conflicts.slice(0, 5).map(function (c) { return L.formatLong(c.incoming.date); }).join(', ') + (p.conflicts.length > 5 ? ' and more' : '')) + '</p>' +
-          '<button class="choice" role="radio" aria-checked="' + (v.choice === 'keep') + '" data-action="imp-choice" data-c="keep"><span class="dot"></span><span><b>Keep what is saved here</b><br><span class="muted small">Recommended. Those days are left alone.</span></span></button>' +
-          '<button class="choice" role="radio" aria-checked="' + (v.choice === 'replace') + '" data-action="imp-choice" data-c="replace"><span class="dot"></span><span><b>Replace with the imported version</b><br><span class="muted small">Your current answers for those days are lost.</span></span></button>';
-      }
-      if (nothing) body += '<p>There is nothing new to import.</p>';
-      bottom = '<button class="btn primary" data-action="' + (nothing ? 'imp-close' : 'imp-run') + '">' + (nothing ? 'Close' : 'Import') + '</button>';
-    } else bottom = '<button class="btn primary" data-action="imp-check">Check data</button>';
-    return plain({ back: 'imp-close', body: body, bottom: bottom });
-  }
-
-  // ---------- export ----------
-  function renderExport() {
-    var v = view, isCsv = v.kind === 'csv';
-    var body = '<h1 tabindex="-1">' + (isCsv ? 'Spreadsheet export' : 'Backup') + '</h1><p class="muted">' + (isCsv ? 'One row per day, for Numbers, Excel or Sheets.' : 'Keep this somewhere safe: save the file, or copy the text into Notes or an email to yourself. You can restore it later with Import data.') + '</p>' +
-      (downloads ? '<button class="btn primary" data-action="exp-save">Save as file</button>' : '') + '<button class="btn' + (downloads ? '' : ' primary') + '" data-action="exp-copy">Copy text</button>' +
-      (v.msg ? '<p class="' + (v.msgOk ? 'ok' : 'err') + '" role="status">' + esc(v.msg) + '</p>' : '') +
-      '<label class="visually-hidden" for="exp-text">Exported data</label><textarea class="code" id="exp-text" readonly>' + esc(v.text) + '</textarea>';
-    return plain({ back: 'exp-close', body: body });
-  }
-  function doExport(kind) {
-    if (kind === 'json') var text = L.buildBackup(settings, entryList(), allQuickLogs());
-    else text = L.buildCsv(entryList(), settings.medications, allQuickLogs());
-    view = { name: 'export', kind: kind, text: text, msg: '', msgOk: true }; render(true);
-  }
-
-  // ---------- render ----------
-  var lastKey = '', toastTimer = null;
-  function render(reset) {
-    var scrollEl = document.getElementById('scroll'), top = scrollEl ? scrollEl.scrollTop : 0;
-    var active = document.activeElement && document.activeElement.id;
-    var html;
-    if (view.name === 'onboarding') html = renderOnboarding();
-    else if (view.name === 'wizard') html = renderWizard();
-    else if (view.name === 'summary') html = renderSummary();
-    else if (view.name === 'same') html = renderSame();
-    else if (view.name === 'report') html = renderReport();
-    else if (view.name === 'import') html = renderImport();
-    else if (view.name === 'export') html = renderExport();
-    else html = renderTabs();
-    var shEl = app.querySelector('.sheet'), shTop = shEl ? shEl.scrollTop : 0, hadQl = !!shEl;
-    var dlg = currentDlg();
-    app.innerHTML = html + toastHtml() + (ui.ql ? qlSheet() : '') + dlg;
-    if (ui.ql) { var sh2 = app.querySelector('.sheet'); if (hadQl) sh2.scrollTop = shTop; else { var hh = document.getElementById('ql-h'); if (hh) hh.focus({ preventScroll: true }); } }
-    var key = [view.name, view.part, view.tab, view.date, view.index, view.edit, view.stage, ui.obStep, ui.setMode].join('|');
-    var sc = document.getElementById('scroll');
-    if (sc) sc.scrollTop = (key === lastKey && !reset) || (key === lastKey) ? top : 0;
-    var calEl = document.getElementById('cal'); if (calEl) calEl.scrollLeft = (ui.calIdx || 0) * calEl.clientWidth;
-    if (dlg) { var dh = document.getElementById('dlg-h'); if (dh) dh.focus({ preventScroll: true }); }
-    else if (key !== lastKey && !ui.ql) { var h = app.querySelector('h1[tabindex]'); if (h) h.focus({ preventScroll: true }); }
-    else if (active) { var a = document.getElementById(active); if (a && a.focus && a.tagName !== 'BUTTON') a.focus(); }
-    lastKey = key;
-    if (ui.focusPart && view.name === 'summary') {
-      var fp = String(ui.focusPart); ui.focusPart = 0;
-      var hits = [].slice.call(app.querySelectorAll('[data-part="' + fp + '"]')); if (!hits.length) hits = [].slice.call(app.querySelectorAll('[data-edit-part="' + fp + '"]'));
-      if (hits.length) { hits.forEach(function (h) { h.classList.add('hl'); }); var sc2 = document.getElementById('scroll'); if (sc2) sc2.scrollTop = Math.max(0, hits[0].getBoundingClientRect().top - sc2.getBoundingClientRect().top + sc2.scrollTop - 80); }
-    }
-    var tEl = document.getElementById('toast');
-    if (tEl && ui.toast) { var msg = ui.toast; clearTimeout(toastTimer); toastTimer = setTimeout(function () { if (ui.toast === msg) { ui.toast = ''; var x = document.getElementById('toast'); if (x) x.remove(); } }, 4000); }
-  }
-
-  // ---------- dialogs: every question or confirmation opens as an overlay that can be dismissed ----------
-  function dlgHtml(title, text, buttons) {
-    return '<div class="overlay"><button class="backdrop" data-action="dlg-close" aria-label="Close"></button><div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="dlg-h"><div class="grab"></div>' +
-      '<div class="shead"><h2 id="dlg-h" tabindex="-1">' + esc(title) + '</h2><button class="link right" data-action="dlg-close" aria-label="Close">✕</button></div>' +
-      '<p class="muted">' + text + '</p>' + buttons + '</div></div>';
-  }
-  function currentDlg() {
-    if (ui.yAsk && view.name === 'tabs') {
-      var ya = ui.yAsk, YP = PARTS[ya.part], canSame = !partAnswered(entries[ya.date], ya.part) && copySource(ya.date, ya.part);
-      return dlgHtml('Yesterday · ' + YP.short, 'You have not answered this part yet. ' + (canSame ? 'If it was the same as the day before, you can save those answers after a quick look.' : 'Answer the ' + plural(YP.to - YP.from + 1, 'question', 'questions') + ' now.'), (canSame ? '<button class="btn primary" data-action="y-same">Same as the day before</button>' : '') + '<button class="btn' + (canSame ? '' : ' primary') + '" data-action="y-answer">' + (canSame ? 'Answer the questions' : 'Answer now') + '</button>');
-    }
-    if (view.name === 'summary' && ui.resetPart && entries[view.date]) {
-      var rp = ui.resetPart, RP = PARTS[rp], rn = dayNumber(view.date);
-      return dlgHtml('Reset ' + RP.short.toLowerCase() + '?', 'Your answers to the ' + plural(RP.to - RP.from + 1, 'question', 'questions') + ' in this part for ' + esc(L.formatLong(view.date)) + (rn ? ' (Day ' + rn + ')' : '') + ' will be deleted, so you can answer them again. The other parts and quick logs stay. This cannot be undone.', '<button class="btn danger" data-action="part-reset-yes">Yes, reset ' + esc(RP.short.toLowerCase()) + '</button><button class="btn" data-action="dlg-close">Keep it</button>');
-    }
-    if (view.name === 'tabs' && ui.rmQl) return dlgHtml('Remove this log?', 'It will be deleted from the day and from your overview.', '<button class="btn danger" data-action="ql-rm-yes" data-id="' + esc(ui.rmQl) + '">Yes, remove</button><button class="btn" data-action="dlg-close">Keep it</button>');
-    if (view.name === 'tabs' && view.tab === 'settings' && ui.setMode === 'wipe') return dlgHtml('Delete everything?', 'Every day and your medication details will be removed from this browser. This cannot be undone. Export a backup first if you want to keep your diary.', '<button class="btn" data-action="export-json">Export a backup first</button><button class="btn danger" data-action="wipe-confirm">Delete everything</button><button class="btn" data-action="dlg-close">Cancel</button>');
-    if (view.name === 'import' && view.stage === 'confirm' && view.plan) return dlgHtml('Replace ' + plural(view.plan.conflicts.length, 'day', 'days') + '?', 'The answers saved here for those days will be replaced by the imported version. This cannot be undone.', '<button class="btn danger" data-action="imp-write">Replace</button><button class="btn" data-action="dlg-close">Go back</button>');
-    if (view.name === 'import' && view.stage === 'done') return dlgHtml('Import finished', plural(view.written, 'day was', 'days were') + ' written to this browser.', '<button class="btn" data-action="imp-done">Done</button>');
-    return '';
-  }
-  function toastHtml() { return ui.toast ? '<div class="toast" id="toast" role="status"><span>✓ ' + esc(ui.toast) + '</span><button data-action="toast-close" aria-label="Close message">✕</button></div>' : ''; }
-
-  // ---------- events ----------
-  app.addEventListener('click', function (ev) {
-    var el = ev.target.closest('[data-action]'); if (!el || el.disabled) return;
-    var a = el.getAttribute('data-action'), d = el.dataset;
-    switch (a) {
-      case 'ob-back': ui.obStep--; ui.err = ''; render(); break;
-      case 'ob-import': go({ name: 'import', text: '', error: null, plan: null, choice: 'keep', stage: 'review', written: 0 }); break;
-      case 'ob-start-prev': ui.obStart = L.addDays(ui.obStart, -1); render(); break;
-      case 'ob-start-next': if (ui.obStart < today()) ui.obStart = L.addDays(ui.obStart, 1); render(); break;
-      case 'ob-next':
-        if (ui.obStep === 1 && !ui.obName.trim()) { ui.err = 'Enter the name of your medication.'; render(); break; }
-        if (ui.obStep === 2 && !parseDose(ui.obDose)) { ui.err = 'Enter your dose in mg, for example 10.'; render(); break; }
-        if (ui.obStep === 3) { settings = { onboarded: true, medications: [{ id: newId(), name: ui.obName.trim(), doseMg: parseDose(ui.obDose), startDate: ui.obStart }] }; saveSettings(); go({ name: 'tabs', tab: 'home' }); break; }
-        ui.obStep++; ui.err = ''; render(); break;
-      case 'toast-close': ui.toast = ''; var tn = document.getElementById('toast'); if (tn) tn.remove(); break;
-      case 'tab': ui.toast = ''; ui.rmQl = null; ui.backTab = null; view = { name: 'tabs', tab: d.tab }; ui.setMode = 'list'; render(true); break;
-      case 'reload-app': try { location.reload(); } catch (x) { ui.toast = 'Close the app and open it again to update.'; render(true); } break;
-      case 'goto-day': ui.day = d.date; render(true); break;
-      case 'day-prev': ui.day = L.addDays(ui.day, -1); render(); break;
-      case 'day-next': if (ui.day < today()) ui.day = L.addDays(ui.day, 1); render(); break;
-      case 'open-day': if (d.from) ui.backTab = d.from; openDay(d.date); break;
-      case 'cal-day': if (entries[d.date]) { ui.backTab = 'history'; ui.calSel = d.date; openDay(d.date); } else { ui.calSel = d.date; render(); } break;
-      case 'cal-prev': calSync(ui.calIdx - 1, true); break;
-      case 'cal-next': calSync(ui.calIdx + 1, true); break;
-      case 'y-part': var yn = Number(d.part), ye2 = entries[d.date];
-        if (ye2 && partDone(ye2, yn)) { ui.backTab = 'home'; go({ name: 'summary', date: d.date, part: yn }); }
-        else if (partAvailable(d.date, yn)) { ui.yAsk = { date: d.date, part: yn }; render(true); }
-        else { ui.backTab = 'home'; openDay(d.date); }
-        break;
-      case 'start-part': startPart(d.date, Number(d.part)); break;
-      case 'same': ui.backTab = 'home'; startSame(d.date, Number(d.part)); break;
-      case 'same-back': var se = entries[view.date], sr = ui.sameRestore; if (sr && sr.date === view.date) { if (sr.none) dropEntry(view.date); else putEntry(sr); } ui.sameRestore = null; var sbt = ui.backTab || 'home'; ui.backTab = null; go({ name: 'tabs', tab: sbt }); break;
-      case 'same-edit': go({ name: 'wizard', date: view.date, index: Number(d.i), edit: true, ret: 'same', retPart: view.part }); break;
-      case 'same-save': var ss = entries[view.date], sp = view.part; putEntry(withParts(Object.assign({}, ss, { step: PARTS[sp].to }), sp)); ui.sameRestore = null; ui.toast = PARTS[sp].done + '.'; ui.day = today(); ui.backTab = null; go({ name: 'tabs', tab: 'home' }); break;
-      case 'same-scratch': var sr2 = ui.sameRestore, sp2 = view.part; if (sr2 && sr2.date === view.date) { if (sr2.none) dropEntry(view.date); else putEntry(sr2); } ui.sameRestore = null; startPart(view.date, sp2); break;
-      case 'ql-open': ui.toast = ''; ui.ql = { when: 'now', time: '', sel: {}, moreD: false, moreH: false, note: '', noteOpen: false, err: '' }; render(); break;
-      case 'ql-close': ui.ql = null; render(); break;
-      case 'ql-when': ui.ql.when = d.w; if (d.w === 'earlier' && !ui.ql.time) ui.ql.time = hhmm(); ui.ql.err = ''; render(); break;
-      case 'ql-toggle': if (ui.ql.sel[d.k]) delete ui.ql.sel[d.k]; else ui.ql.sel[d.k] = 1; ui.ql.err = ''; render(); break;
-      case 'ql-more': if (d.w === 'D') ui.ql.moreD = true; else ui.ql.moreH = true; render(); break;
-      case 'ql-note': ui.ql.noteOpen = true; render(); var qn = document.getElementById('ql-note'); if (qn) qn.focus(); break;
-      case 'ql-save':
-        var items = Object.keys(ui.ql.sel).map(function (k) { var pr = k.split('.'); return { q: pr[0], o: pr[1] }; }), tm = ui.ql.when === 'now' ? hhmm() : ui.ql.time;
-        if (!items.length) { ui.ql.err = 'Choose at least one thing to log.'; render(); break; }
-        if (!L.isValidTime(tm)) { ui.ql.err = 'Enter the time like 14:30.'; render(); break; }
-        putQuickLog({ id: newId(), date: today(), time: tm, items: items, note: ui.ql.note.trim() || undefined, createdAt: now() });
-        ui.ql = null; ui.toast = 'Logged at ' + tm + '.'; ui.day = ui.day; render(); break;
-      case 'ql-rm': ui.rmQl = d.id; render(); break;
-      case 'ql-rm-yes': removeQuickLog(d.id); ui.rmQl = null; render(); break;
-      case 'ov': ui.ovDays = Number(d.days); render(); break;
-      // wizard
-      case 'toggle': var q = L.QUESTIONS[view.index], e = entries[view.date], ans = e.answers[q.id] || { selected: [] };
-        setAnswer({ selected: L.toggleOption(q, ans.selected, d.o), skipped: false, note: ans.note }); render(); break;
-      case 'food': var wf = entries[view.date].details.withFood, want = d.v === 'yes'; setDetails({ withFood: wf === want ? undefined : want }); render(); break;
-      case 'strongest': setDetails({ strongest: entries[view.date].details.strongest === d.v ? undefined : d.v }); render(); break;
-      case 'note-open': view.noteOpen = true; render(); var n = document.getElementById('w-note'); if (n) n.focus(); break;
-      case 'w-next': case 'w-skip': advance(); break;
-      case 'w-back': wizBack(); break;
-      // summary
-      case 'sum-edit': go({ name: 'wizard', date: view.date, index: Number(d.i), edit: true, sumPart: view.part }); break;
-      case 'dlg-close': dlgClose(); break;
-      case 'y-same': var ya2 = ui.yAsk; ui.yAsk = null; startSame(ya2.date, ya2.part); break;
-      case 'y-answer': var ya3 = ui.yAsk; ui.yAsk = null; startPart(ya3.date, ya3.part); break;
-      case 'reset-part': ui.resetPart = Number(d.p); render(true); break;
-      case 'part-reset-yes': var rpn = ui.resetPart; ui.resetPart = 0; resetPart(view.date, rpn); break;
-      case 'sum-done': ui.resetPart = 0; var bt = ui.backTab || 'home'; ui.backTab = null; go({ name: 'tabs', tab: bt }); break;
-      // settings
-      case 'set-dose': ui.setMode = 'dose'; ui.fDose = ''; ui.fStart = today(); ui.err = ''; render(true); break;
-      case 'set-new': ui.setMode = 'new'; ui.fName = ''; ui.fDose = ''; ui.fStart = today(); ui.err = ''; render(true); break;
-      case 'set-cancel': ui.setMode = 'list'; ui.err = ''; render(true); break;
-      case 'set-wipe': ui.setMode = 'wipe'; render(true); break;
-      case 'f-start-prev': ui.fStart = L.addDays(ui.fStart, -1); render(); break;
-      case 'f-start-next': if (ui.fStart < today()) ui.fStart = L.addDays(ui.fStart, 1); render(); break;
-      case 'save-dose': case 'save-new':
-        var cur = currentMed(), dose = parseDose(ui.fDose);
-        if (a === 'save-new' && !ui.fName.trim()) { ui.err = 'Enter the name of the medication.'; render(); break; }
-        if (!dose) { ui.err = 'Enter the dose in mg, for example 10.'; render(); break; }
-        if (cur && ui.fStart <= cur.startDate) { ui.err = 'Pick a day after ' + L.formatLong(cur.startDate) + '.'; render(); break; }
-        var nm = { id: newId(), name: a === 'save-dose' ? cur.name : ui.fName.trim(), doseMg: dose, startDate: ui.fStart };
-        settings.medications = settings.medications.map(function (m) { return cur && m.id === cur.id ? Object.assign({}, m, { endDate: L.addDays(nm.startDate, -1) }) : m; }).concat([nm]);
-        saveSettings(); ui.setMode = 'list'; ui.err = ''; render(true); break;
-      case 'wipe-confirm': skeys().filter(function (k) { return k.indexOf('meddiary.') === 0; }).forEach(sdel); sset('meddiary.noseed', '1'); entries = {}; quickLogs = {}; ui.toast = ''; settings = { onboarded: false, medications: [] }; meta = { lastExportAt: null }; ui.obStep = 0; ui.obDose = ''; ui.setMode = 'list'; go({ name: 'onboarding' }); break;
-      case 'export-json': doExport('json'); break;
-      case 'export-csv': doExport('csv'); break;
-      case 'report': go({ name: 'report', msg: '', msgOk: false }); break;
-      case 'rep-close': go({ name: 'tabs', tab: 'settings' }); break;
-      case 'rep-save': var rr = buildReport(); if (rr && downloads) { var rb; try { rb = pdfBytes(rr); } catch (x) { view.msg = 'Could not build the PDF.'; view.msgOk = false; render(true); break; } downloads.save({ filename: 'med-diary-doctor-summary-' + today() + '.pdf', data: rb }).then(function () { ui.toast = 'PDF saved.'; render(true); }, function (err) { view.msg = err && err.code === 'declined' ? 'Not saved.' : 'Saving a file is not available here.'; view.msgOk = false; render(true); }); } break;
-      case 'rep-copy': var rt = buildReport(); if (rt) { var txt = reportText(rt); (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { ui.toast = 'Copied.'; render(true); }, function () { view.msg = 'Copying is not available here.'; view.msgOk = false; render(true); }); } break;
-      case 'import': go({ name: 'import', text: '', error: null, plan: null, choice: 'keep', stage: 'review', written: 0 }); break;
-      // export screen
-      case 'exp-close': go({ name: 'tabs', tab: 'settings' }); break;
-      case 'exp-save': if (downloads) {
-          var fname = view.kind === 'csv' ? 'med-diary-' + today() + '.csv' : 'med-diary-backup-' + today() + '.json';
-          downloads.save({ filename: fname, data: view.text }).then(function () { if (view.kind === 'json') { meta.lastExportAt = now(); saveMeta(); } ui.toast = 'File saved.'; render(); }, function (err) { view.msg = err && err.code === 'declined' ? 'Not saved.' : 'Saving a file is not available here. Use Copy text instead.'; view.msgOk = false; render(); });
-        } break;
-      case 'exp-copy':
-        var ta = document.getElementById('exp-text'), text = view.text;
-        var done = function (ok) { if (ok && view.kind === 'json') { meta.lastExportAt = now(); saveMeta(); } if (ok) { view.msg = ''; ui.toast = 'Copied. Paste it into Notes or an email to yourself.'; } else { view.msg = 'Copying was blocked. Tap the text, select all, and copy it by hand.'; view.msgOk = false; } render(); if (!ok) { var t2 = document.getElementById('exp-text'); if (t2) { t2.focus(); t2.select(); } } };
-        var fallback = function () { var ok = false; try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); } catch (x) { } done(ok); };
-        try { navigator.clipboard.writeText(text).then(function () { done(true); }, fallback); } catch (x) { fallback(); } break;
-      // import screen
-      case 'imp-close': view.stage = 'review'; var from = settings.onboarded ? { name: 'tabs', tab: 'settings' } : { name: 'onboarding' }; go(from); break;
-      case 'imp-check': var r = L.parseBackup(view.text);
-        if (!r.ok) { view.error = r.error; view.plan = null; } else { view.error = null; view.choice = 'keep'; view.plan = L.planImport(r, entryList(), settings.medications, allQuickLogs()); }
-        render(); break;
-      case 'imp-fill': view.text = HISTORY_JSON; view.plan = null; view.error = null; render(); break;
-      case 'imp-choice': view.choice = d.c; render(); break;
-      case 'imp-run': if (view.choice === 'replace' && view.plan.conflicts.length) { view.stage = 'confirm'; render(true); } else impWrite(); break;
-      case 'imp-write': impWrite(); break;
-      case 'imp-back': view.stage = 'review'; render(true); break;
-      case 'imp-done': ui.day = today(); go(settings.onboarded ? { name: 'tabs', tab: 'home' } : { name: 'onboarding' }); break;
-    }
-  });
-  /** Delete one part's answers only; the other parts stay. */
-  function resetPart(date, n) {
-    var e = entries[date]; if (!e) { render(true); return; }
-    var ps = [1, 2, 3].filter(function (k) { return k !== n && partDone(e, k); }), o = JSON.parse(JSON.stringify(e)), P = PARTS[n];
-    L.QUESTIONS.slice(P.from, P.to + 1).forEach(function (q) { delete o.answers[q.id]; });
-    var any = Object.keys(o.answers).length > 0;
-    ui.toast = P.short + ' was reset.';
-    if (!any && !ps.length) { dropEntry(date); ui.day = today(); var bt2 = ui.backTab || 'home'; ui.backTab = null; go({ name: 'tabs', tab: bt2 }); return; }
-    o.parts = ps; o.status = ps.length === 3 ? 'complete' : (ps.indexOf(1) >= 0 && ps.indexOf(2) >= 0) ? 'awaiting' : 'in_progress'; o.step = Math.min(o.step || 0, P.from); o.updatedAt = now();
-    if (o.status !== 'complete') delete o.completedAt;
-    if (!any) delete o.copiedFrom;
-    putEntry(o);
-    if (view.part) { ui.day = today(); var bt3 = ui.backTab || 'home'; ui.backTab = null; go({ name: 'tabs', tab: bt3 }); return; }
-    render(true);
-  }
-  function dlgClose() {
-    if (ui.yAsk) ui.yAsk = null; else if (ui.resetPart) ui.resetPart = 0; else if (ui.rmQl) ui.rmQl = null; else if (ui.setMode === 'wipe') ui.setMode = 'list';
-    else if (view.name === 'import' && view.stage === 'confirm') view.stage = 'review';
-    else if (view.name === 'import' && view.stage === 'done') { ui.day = today(); go(settings.onboarded ? { name: 'tabs', tab: 'home' } : { name: 'onboarding' }); return; }
-    render(true);
-  }
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && currentDlg()) dlgClose(); });
-  function impWrite() {
-    var res = L.applyPlan(view.plan, view.choice);
-    res.entries.forEach(putEntry); res.quickLogs.forEach(putQuickLog);
-    settings.medications = settings.medications.concat(res.medications);
-    settings.onboarded = settings.onboarded || settings.medications.length > 0;
-    saveSettings();
-    view.written = res.entries.length; view.stage = 'done'; render(true);
-  }
-  var calTimer = null;
-  app.addEventListener('scroll', function (ev) {
-    var c = ev.target; if (!c || c.id !== 'cal') return;
-    clearTimeout(calTimer);
-    calTimer = setTimeout(function () { if (!c.isConnected || c !== document.getElementById('cal')) return; var w = c.clientWidth || 1, idx = Math.round(c.scrollLeft / w); if (idx !== ui.calIdx) calSync(idx, false); }, 80);
-  }, true);
-  app.addEventListener('input', function (ev) {
-    var t = ev.target, b = t.getAttribute && t.getAttribute('data-bind'); if (!b) return;
-    if (b === 'ob-name') ui.obName = t.value;
-    else if (b === 'ob-dose') ui.obDose = t.value;
-    else if (b === 'f-name') ui.fName = t.value;
-    else if (b === 'f-dose') ui.fDose = t.value;
-    else if (b === 'ql-note') ui.ql.note = t.value;
-    else if (b === 'ql-time') ui.ql.time = t.value;
-    else if (b === 'imp-text') { view.text = t.value; view.plan = null; view.error = null; }
-    else if (b === 'w-dose') { view.doseText = t.value; setDetails({ doseMg: parseDose(t.value) }); }
-    else if (b === 'w-time') {
-      var digits = t.value.replace(/\D/g, '').slice(0, 4), f = digits.length > 2 ? digits.slice(0, 2) + ':' + digits.slice(2) : digits;
-      t.value = f; view.timeText = f; setDetails({ takenTime: L.isValidTime(f) ? f : undefined });
-      var hint = document.getElementById('w-time-hint'); if (hint) hint.textContent = f.length > 0 && !L.isValidTime(f) ? 'Use 24-hour time, like 08:30.' : 'For example 08:30';
-    }
-    else if (b === 'w-note') { var q = L.QUESTIONS[view.index], e = entries[view.date], ans = e.answers[q.id] || { selected: [] }; setAnswer({ selected: ans.selected, note: t.value, skipped: false }); }
-  });
-  app.addEventListener('change', function (ev) {
-    var t = ev.target;
-    if (t.id === 'imp-file' && t.files && t.files[0]) {
-      var rd = new FileReader();
-      rd.onload = function () { view.text = String(rd.result || ''); view.plan = null; view.error = null; render(); };
-      rd.onerror = function () { view.error = 'That file could not be read.'; render(); };
-      rd.readAsText(t.files[0]);
-    }
-  });
-
-  render(true);
-})();
-</script>
-
-</body></html>
+    ['q3', 'q4', 'q6', 'q7', 'q8', 'q9'].forEach(function (qid) { L.QUESTION_BY_ID[qid].options.forEach(function (o) { if (o.valence === val && !o.exclusive && !seen[qid + '.' + o.id
